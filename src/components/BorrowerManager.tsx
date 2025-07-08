@@ -73,7 +73,7 @@ const BorrowerCard = ({
       edit: "Edit",
       delete: "Delete",
       totalLoans: "Loans Amount",
-      pendingPayment: "Pending Payment",
+      pendingPayment: "Pending Pay",
       deleteWarning: "Cannot undo. Settle loans to delete.",
       paymentHistory: "Payment History",
     },
@@ -105,7 +105,7 @@ const BorrowerCard = ({
                 : formatDisplayName(borrower)}
             </span>
           </div>
-            <div className="flex gap-2 ml-2">
+            <div className="flex gap-1 ml-1">
               {/* View Button - now first */}
               <span className="border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 flex items-center h-8 w-8 justify-center transition-colors duration-150 hover:border-green-400 dark:hover:border-green-400">
               <Button
@@ -188,20 +188,20 @@ const BorrowerCard = ({
         </div>
         <div className="grid grid-cols-3 gap-2 pt-0">
           <div className="flex flex-col items-center flex-1 bg-blue-50 dark:bg-blue-950/30 rounded-lg py-2">
-            <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
+            <div className="text-sm font-bold text-blue-700 dark:text-blue-300">
               {borrower.total_loans ?? 0}
             </div>
             <div className="text-xs text-gray-500">Total Loans</div>
           </div>
           <div className="flex flex-col items-center flex-1 bg-purple-50 dark:bg-purple-950/30 rounded-lg py-2">
-            <div className="text-lg font-bold text-purple-700 dark:text-purple-300">
-              ₹{(borrower.total_amount || 0).toLocaleString()}
+            <div className="text-sm font-bold text-purple-700 dark:text-purple-300">
+              {(borrower.total_amount || 0).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">{t.totalLoans}</div>
           </div>
           <div className="flex flex-col items-center flex-1 bg-red-50 dark:bg-red-950/30 rounded-lg py-2">
-            <div className="text-lg font-bold text-red-700 dark:text-red-300">
-              ₹{(borrower.pending_payment ?? borrower.remaining_amount ?? 0).toLocaleString()}
+            <div className="text-sm font-bold text-red-700 dark:text-red-300">
+              {(borrower.pending_payment ?? borrower.remaining_amount ?? 0).toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">{t.pendingPayment}</div>
           </div>

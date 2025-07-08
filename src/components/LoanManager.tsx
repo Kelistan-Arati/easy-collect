@@ -743,7 +743,7 @@ const LoanManager = ({ language, loans, borrowers, onDataChange }: LoanManagerPr
                         Arrears
                       </span>
                       <span className="text-xs font-bold text-red-700 dark:text-red-500 truncate">
-                        ₹ {calculateArrears(loan).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        ₹ {calculateArrears(loan).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="bg-gray-50/80 dark:bg-gray-800/80 rounded-lg px-2 py-1 flex flex-col items-start text-left min-w-0">
