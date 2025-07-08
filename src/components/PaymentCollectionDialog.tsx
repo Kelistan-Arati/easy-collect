@@ -111,6 +111,22 @@ const PaymentCollectionDialog = ({
     return end.toISOString().split("T")[0];
   };
 
+  // Helper to calculate arrears (same as card)
+  const calculateArrears = (loan: Loan) => {
+    const today = new Date();
+    const startDate = new Date(loan.start_date);
+    const daysSinceStart = Math.floor(
+      (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const dailyPayment = loan.total_amount / (loan.duration_months * 30);
+    const expectedPaymentByNow = Math.min(
+      dailyPayment * daysSinceStart,
+      loan.total_amount
+    );
+    const arrears = Math.max(0, expectedPaymentByNow - loan.amount_paid);
+    return arrears;
+  };
+
   // Helper to generate and download PDF receipt
   const generateReceiptPDF = ({
     phone,
@@ -127,6 +143,7 @@ const PaymentCollectionDialog = ({
     paymentAmount,
     closingBalance,
     broughtForward,
+    arrears,
   }: {
     phone: string;
     date: string;
@@ -142,35 +159,40 @@ const PaymentCollectionDialog = ({
     paymentAmount: number;
     closingBalance: number;
     broughtForward: number;
+    arrears: number;
   }) => {
+    // Margins and paddings
     const pageWidth = 58; // mm
-    const margin = 4; // mm
+    const margin = 4; // mm (increased for overall margin)
+    const contentPadding = 2; // mm (inner padding)
+    const dividerPadY = 2; // mm vertical space above/below divider
 
     // --- Step 1: Measure content height ---
-    let y = margin + 4;
+    let y = margin + contentPadding;
     const line = (h = 5) => (y += h);
-    y = margin + 4;
+
+    y = margin + contentPadding;
+    line(dividerPadY + 2); // Divider
     line(0); // Title
     line(6); // Customer
     line(5); // Bill Date
-    line(4); // Divider
+    line(5); // Loan Period
+    line(dividerPadY + 2); // Divider
     line(5); // Loan Amount
     line(5); // Daily Payment
     line(5); // Duration
     line(5); // Start Date
     line(5); // End Date
     line(5); // Total Paid
-    line(5); // Total Due
-    line(4); // Divider
+    line(dividerPadY + 2); // Divider
     line(5); // Paid Today
-    line(5); // Brought Forward
     line(5); // Arrears
     line(5); // Closing Balance
-    line(6); // Divider
+    line(dividerPadY + 2); // Divider
     line(5); // Thank You
-    line(5); // Divider
+    line(dividerPadY + 2); // Divider
 
-    const contentHeight = y + margin + 2; // Add a little padding
+    const contentHeight = y + margin + contentPadding;
 
     // --- Step 2: Create final doc with measured height and margin ---
     const doc = new jsPDF({
@@ -178,119 +200,191 @@ const PaymentCollectionDialog = ({
       format: [pageWidth + margin * 2, contentHeight],
     });
 
-    y = margin + 2;
-    doc.setFontSize(10);
-    doc.setFont(undefined, "bold");
-    // Adjust margin for the receipt title to match the attached image (centered, with more top margin)
-    doc.text("$ INSTALLMENT RECEIPT $", (pageWidth + margin * 2) / 2, y + 2, {
-      align: "center",
-    });
-    doc.setFont(undefined, "normal");
-    y += 9;
+    y = margin + contentPadding;
     doc.setFontSize(8);
-    doc.text(`Customer :`, margin + 2, y, { align: "left" });
-    doc.text(`${customerName}`, pageWidth + margin - 2, y, { align: "right" });
-    y += 5;
-    doc.text(`Bill Date :`, margin + 2, y, { align: "left" });
-    doc.text(`${date} ${time}`, pageWidth + margin - 2, y, { align: "right" });
-    y += 5;
-    // Start Date left, End Date right (below Bill Date)
-    doc.text(`Loan Period :`, margin + 2, y, { align: "left" });
-    doc.text(`${startDate} to ${endDate}`, pageWidth + margin - 2, y, {
-      align: "right",
-    });
-    y += 4;
-    // Change dashed line to right-aligned like other lines
+    // Divider (centered)
     doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
       align: "center",
     });
-    y += 4;
-    doc.text(`Loan Amount :`, margin + 2, y, { align: "left" });
+    doc.setFontSize(8);
+
+    // Title (centered)
+    y += 5;
+    doc.setFontSize(11);
+    doc.setFont(undefined, "bold");
+    doc.text("$ INSTALLMENT RECEIPT $", (pageWidth + margin * 2) / 2, y, {
+      align: "center",
+    });
+    doc.setFont(undefined, "normal");
+
+    doc.setFontSize(8);
+    // Divider (centered)
+    y += dividerPadY + 2;
+    doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
+      align: "center",
+    });
+    doc.setFontSize(8);
+
+    // Customer
+    y += dividerPadY + 2;
+    doc.setFontSize(8);
+    doc.text(`Customer :`, margin + contentPadding, y, { align: "left" });
+    doc.text(`${customerName}`, pageWidth + margin - contentPadding, y, {
+      align: "right",
+    });
+
+    // Bill Date
+    y += 5;
+    doc.text(`Bill Date :`, margin + contentPadding, y, { align: "left" });
+    doc.text(`${date} ${time}`, pageWidth + margin - contentPadding, y, {
+      align: "right",
+    });
+
+    // Loan Period
+    y += 5;
+    doc.text(`Loan Period :`, margin + contentPadding, y, { align: "left" });
+    doc.text(
+      `${startDate} to ${endDate}`,
+      pageWidth + margin - contentPadding,
+      y,
+      {
+        align: "right",
+      }
+    );
+
+    // Divider (centered)
+    y += dividerPadY + 2;
+    doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
+      align: "center",
+    });
+
+    // Loan Amount
+    y += dividerPadY + 2;
+    doc.text(`Loan Amount :`, margin + contentPadding, y, { align: "left" });
     doc.text(
       `${parseFloat(loanAmount.toString()).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`,
-      pageWidth + margin - 2,
+      pageWidth + margin - contentPadding,
       y,
       { align: "right" }
     );
+
+    // Daily Payment
     y += 5;
-    // Add Total Interest below Loan Amount
-    const totalInterest = loan.total_amount - loan.principal_amount;
-    doc.text(`Total Interest :`, margin + 2, y, { align: "left" });
-    doc.text(
-      `${totalInterest.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`,
-      pageWidth + margin - 2,
-      y,
-      { align: "right" }
-    );
-    y += 5;
-    doc.text(`Daily Payment :`, margin + 2, y, { align: "left" });
+    doc.text(`Daily Payment :`, margin + contentPadding, y, { align: "left" });
     doc.text(
       `${parseFloat(dailyPayment.toString()).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`,
-      pageWidth + margin - 2,
+      pageWidth + margin - contentPadding,
       y,
       { align: "right" }
     );
+
+    // Duration
     y += 5;
-    doc.text(`Duration :`, margin + 2, y, { align: "left" });
-    doc.text(`${duration} days`, pageWidth + margin - 2, y, { align: "right" });
-    y += 5;
-    doc.text(`Total Paid :`, margin + 2, y, { align: "left" });
-    doc.text(`${amountPaid.toLocaleString()}`, pageWidth + margin - 2, y, {
+    doc.text(`Duration :`, margin + contentPadding, y, { align: "left" });
+    doc.text(`${duration} days`, pageWidth + margin - contentPadding, y, {
       align: "right",
     });
+
+    // Start Date
     y += 5;
-    doc.text(`Total Due :`, margin + 2, y, { align: "left" });
-    doc.text(`${remainingAmount.toLocaleString()}`, pageWidth + margin - 2, y, {
+    doc.text(`Start Date :`, margin + contentPadding, y, { align: "left" });
+    doc.text(`${startDate}`, pageWidth + margin - contentPadding, y, {
       align: "right",
     });
-    y += 4;
+
+    // End Date
+    y += 5;
+    doc.text(`End Date :`, margin + contentPadding, y, { align: "left" });
+    doc.text(`${endDate}`, pageWidth + margin - contentPadding, y, {
+      align: "right",
+    });
+
+    // Total Paid
+    y += 5;
+    doc.text(`Total Paid :`, margin + contentPadding, y, { align: "left" });
+    doc.text(
+      `${amountPaid.toLocaleString()}`,
+      pageWidth + margin - contentPadding,
+      y,
+      {
+        align: "right",
+      }
+    );
+
+    // Divider (centered)
+    y += dividerPadY + 2;
     doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
       align: "center",
     });
-    y += 4;
+
+    // Paid Today
+    y += dividerPadY + 2;
     doc.setFont(undefined, "bold");
-    doc.text(`Paid Today:`, margin + 2, y, { align: "left" });
-    doc.text(`${paymentAmount.toLocaleString()}`, pageWidth + margin - 2, y, {
-      align: "right",
-    });
+    doc.text(`Paid Today:`, margin + contentPadding, y, { align: "left" });
+    doc.text(
+      `${paymentAmount.toLocaleString()}`,
+      pageWidth + margin - contentPadding,
+      y,
+      {
+        align: "right",
+      }
+    );
+
+    // Arrears
     y += 5;
-    doc.text(`Brought Forward :`, margin + 2, y, { align: "left" });
-    doc.text(`${broughtForward.toLocaleString()}`, pageWidth + margin - 2, y, {
-      align: "right",
+    doc.text(`Arrears :`, margin + contentPadding, y, { align: "left" });
+    doc.text(
+      `${arrears.toLocaleString()}`,
+      pageWidth + margin - contentPadding,
+      y,
+      {
+        align: "right",
+      }
+    );
+
+    // Closing Balance
+    y += 5;
+    doc.text(`Closing Balance :`, margin + contentPadding, y, {
+      align: "left",
     });
+    doc.text(
+      `${closingBalance.toLocaleString()}`,
+      pageWidth + margin - contentPadding,
+      y,
+      {
+        align: "right",
+      }
+    );
     doc.setFont(undefined, "normal");
-    y += 5;
-    const arrearsAmount = loan.arrears || 0;
-    doc.text(`Arrears :`, margin + 2, y, { align: "left" });
-    doc.text(`${arrearsAmount.toLocaleString()}`, pageWidth + margin - 2, y, { align: "right" });
-    y += 5;
-    doc.text(`Closing Balance :`, margin + 2, y, { align: "left" });
-    doc.text(`${closingBalance.toLocaleString()}`, pageWidth + margin - 2, y, {
-      align: "right",
-    });
-    y += 4;
+
+    // Divider (centered)
+    y += dividerPadY + 2;
     doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
       align: "center",
     });
-    y += 4;
+
+    // Thank You
+    y += dividerPadY + 2;
+    doc.setFontSize(11);
     doc.setFont(undefined, "bold");
     doc.text("* THANK YOU *", (pageWidth + margin * 2) / 2, y, {
       align: "center",
     });
     doc.setFont(undefined, "normal");
-    y += 4;
+    doc.setFontSize(8);
+
+    // Divider (centered)
+    y += dividerPadY + 2;
     doc.text("-".repeat(pageWidth), (pageWidth + margin * 2) / 2, y, {
       align: "center",
     });
+
     doc.save(`Receipt_${customerName}_${date}.pdf`);
   };
 
@@ -353,6 +447,9 @@ const PaymentCollectionDialog = ({
           );
           if (found) phone = found.phone;
         }
+        // Calculate arrears using updated amountPaid (after payment)
+        const updatedLoanForArrears = { ...loan, amount_paid: amountPaid };
+        const arrears = calculateArrears(updatedLoanForArrears);
         generateReceiptPDF({
           phone: phone || "-",
           date: dateStr,
@@ -368,6 +465,7 @@ const PaymentCollectionDialog = ({
           paymentAmount,
           closingBalance,
           broughtForward,
+          arrears, // <-- pass calculated arrears after payment
         });
       }
       // --- End PDF Receipt Generation ---
